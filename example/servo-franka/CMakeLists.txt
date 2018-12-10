@@ -43,6 +43,9 @@ cmake_minimum_required(VERSION 2.6)
 find_package(VISP REQUIRED visp_robot visp_vision visp_io visp_gui visp_vs visp_visual_features visp_detection)
 
 set(example_cpp
+  frankaGripper.cpp
+  frankaMoveToPosition.cpp
+  frankaSavePosition.cpp
   servoFrankaPBVS.cpp
 )
 
@@ -54,6 +57,10 @@ foreach(cpp ${example_cpp})
 endforeach()
 
 if(USE_REALSENSE2)
-  # Add specific build flag to turn off warnings coming from PCL 3rd party
-  vp_set_source_file_compile_flag(servoFrankaPBVS.cpp -Wno-unused-function -Wno-reorder -Wno-sign-compare)
+  if(UNIX)
+    # Add specific build flag to turn off warnings coming from PCL 3rd party
+    vp_set_source_file_compile_flag(servoFrankaPBVS.cpp -Wno-unused-function -Wno-reorder -Wno-sign-compare -Wno-overloaded-virtual)
+  else()
+    visp_set_source_file_compile_flag(servoFrankaPBVS.cpp /wd4244)
+  endif()
 endif()

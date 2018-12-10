@@ -3339,6 +3339,23 @@ void vpMbGenericTracker::setKltMaskBorder(const std::map<std::string, unsigned i
 #endif
 
 /*!
+  Set the visibility mask.
+
+  \param mask : visibility mask.
+*/
+void vpMbGenericTracker::setMask(const vpImage<bool> &mask)
+{
+  vpMbTracker::setMask(mask);
+
+  for (std::map<std::string, TrackerWrapper *>::const_iterator it = m_mapOfTrackers.begin();
+    it != m_mapOfTrackers.end(); ++it) {
+    TrackerWrapper *tracker = it->second;
+    tracker->setMask(mask);
+  }
+}
+
+
+/*!
   Set the threshold for the minimum line length to be considered as visible in
   the LOD case.
 
@@ -4161,32 +4178,7 @@ vpMbGenericTracker::TrackerWrapper::TrackerWrapper(const int trackerType)
 #endif
 }
 
-vpMbGenericTracker::TrackerWrapper::~TrackerWrapper() {
-  vpMbtDistanceLine *l;
-  vpMbtDistanceCylinder *cy;
-  vpMbtDistanceCircle *ci;
-
-  for (std::vector<vpMbtDistanceLine *>::const_iterator it = m_projectionErrorLines.begin(); it != m_projectionErrorLines.end(); ++it) {
-    l = *it;
-    if (l != NULL)
-      delete l;
-    l = NULL;
-  }
-
-  for (std::vector<vpMbtDistanceCylinder *>::const_iterator it = m_projectionErrorCylinders.begin(); it != m_projectionErrorCylinders.end(); ++it) {
-    cy = *it;
-    if (cy != NULL)
-      delete cy;
-    cy = NULL;
-  }
-
-  for (std::vector<vpMbtDistanceCircle *>::const_iterator it = m_projectionErrorCircles.begin(); it != m_projectionErrorCircles.end(); ++it) {
-    ci = *it;
-    if (ci != NULL)
-      delete ci;
-    ci = NULL;
-  }
-}
+vpMbGenericTracker::TrackerWrapper::~TrackerWrapper() { }
 
 // Implemented only for debugging purposes: use TrackerWrapper as a standalone tracker
 void vpMbGenericTracker::TrackerWrapper::computeVVS(const vpImage<unsigned char> *const ptr_I)

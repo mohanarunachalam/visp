@@ -55,3 +55,10 @@ else()
     vp_set_source_file_compile_flag(test/key-point/testKeyPoint-4.cpp -Wno-unused-parameter -Wno-unused-but-set-parameter -Wno-overloaded-virtual)
  endif()
 endif()
+
+vp_set_source_file_compile_flag(src/pose-estimation/vpPoseFeatures.cpp -Wno-strict-overflow)
+vp_set_source_file_compile_flag(src/pose-estimation/vpPoseRansac.cpp -Wno-strict-overflow)
+vp_set_source_file_compile_flag(src/pose-estimation/vpLevenbergMarquartd.cpp -Wno-strict-overflow)
+vp_set_source_file_compile_flag(src/key-point/vpKeyPoint.cpp -Wno-strict-overflow)
+
+add_test(testKeyPoint-2-multithreaded testKeyPoint-2 -c ${OPTION_TO_DESACTIVE_DISPLAY} -p)

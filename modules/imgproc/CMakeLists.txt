@@ -36,7 +36,7 @@
 #
 #############################################################################
 
-vp_add_module(imgproc visp_core)
+vp_add_module(imgproc visp_core WRAP java)
 
 # You can add cmake specific material like Find<Package>.cmake files in a specific
 # folder named for example "cmake" and uncomment the following line to use it.
@@ -54,3 +54,6 @@ vp_create_module()
 vp_add_tests(DEPENDS_ON visp_imgproc visp_io)
 
 vp_set_source_file_compile_flag(src/vpCLAHE.cpp -Wno-strict-overflow)
+vp_set_source_file_compile_flag(src/vpThreshold.cpp -Wno-strict-overflow)
+vp_set_source_file_compile_flag(src/vpFloodFill.cpp -Wno-strict-overflow)
+vp_set_source_file_compile_flag(test/testContours.cpp -Wno-strict-overflow)

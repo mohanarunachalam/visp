@@ -63,7 +63,7 @@ vpColVector randV(int n)
 }
 
 #ifdef VISP_HAVE_DISPLAY
-class VISP_EXPORT QPlot
+class QPlot
 {
 public:
   ~QPlot()  { delete P; }
@@ -97,7 +97,7 @@ public:
   vpPlot* P;
 };
 #else
-class VISP_EXPORT QPlot
+class VISP_EXPORT QPPlot
 {
 public:
   QPPlot(int, int , std::vector<std::string> ) {}

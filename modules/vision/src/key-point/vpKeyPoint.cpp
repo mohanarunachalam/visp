@@ -51,13 +51,6 @@
 namespace
 {
 // Specific Type transformation functions
-///*!
-//   Convert a list of cv::DMatch to a cv::DMatch (extract the first
-//   cv::DMatch, the nearest neighbor).
-//
-//   \param knnMatches : List of cv::DMatch.
-//   \return The nearest neighbor.
-// */
 inline cv::DMatch knnToDMatch(const std::vector<cv::DMatch> &knnMatches)
 {
   if (knnMatches.size() > 0) {
@@ -67,26 +60,11 @@ inline cv::DMatch knnToDMatch(const std::vector<cv::DMatch> &knnMatches)
   return cv::DMatch();
 }
 
-///*!
-//   Convert a cv::DMatch to an index (extract the train index).
-//
-//   \param match : Point to convert in ViSP type.
-//   \return The train index.
-// */
 inline vpImagePoint matchRansacToVpImage(const std::pair<cv::KeyPoint, cv::Point3f> &pair)
 {
   return vpImagePoint(pair.first.pt.y, pair.first.pt.x);
 }
 
-// Keep this function to know how to detect big endian with code
-// bool isBigEndian() {
-//  union {
-//    uint32_t i;
-//    char c[4];
-//  } bint = { 0x01020304 };
-//
-//  return bint.c[0] == 1;
-//}
 }
 
 /*!
@@ -107,7 +85,8 @@ vpKeyPoint::vpKeyPoint(const vpFeatureDetectorType &detectorType, const vpFeatur
     m_matcherName(matcherName), m_matches(), m_matchingFactorThreshold(2.0), m_matchingRatioThreshold(0.85),
     m_matchingTime(0.), m_matchRansacKeyPointsToPoints(), m_nbRansacIterations(200), m_nbRansacMinInlierCount(100),
     m_objectFilteredPoints(), m_poseTime(0.), m_queryDescriptors(), m_queryFilteredKeyPoints(), m_queryKeyPoints(),
-    m_ransacConsensusPercentage(20.0), m_ransacInliers(), m_ransacOutliers(), m_ransacReprojectionError(6.0),
+    m_ransacConsensusPercentage(20.0), m_ransacFilterFlag(vpPose::NO_FILTER), m_ransacInliers(), m_ransacOutliers(),
+    m_ransacParallel(false), m_ransacParallelNbThreads(0), m_ransacReprojectionError(6.0),
     m_ransacThreshold(0.01), m_trainDescriptors(), m_trainKeyPoints(), m_trainPoints(), m_trainVpPoints(),
     m_useAffineDetection(false),
 #if (VISP_HAVE_OPENCV_VERSION >= 0x020400 && VISP_HAVE_OPENCV_VERSION < 0x030000)
@@ -142,7 +121,8 @@ vpKeyPoint::vpKeyPoint(const std::string &detectorName, const std::string &extra
     m_matcherName(matcherName), m_matches(), m_matchingFactorThreshold(2.0), m_matchingRatioThreshold(0.85),
     m_matchingTime(0.), m_matchRansacKeyPointsToPoints(), m_nbRansacIterations(200), m_nbRansacMinInlierCount(100),
     m_objectFilteredPoints(), m_poseTime(0.), m_queryDescriptors(), m_queryFilteredKeyPoints(), m_queryKeyPoints(),
-    m_ransacConsensusPercentage(20.0), m_ransacInliers(), m_ransacOutliers(), m_ransacReprojectionError(6.0),
+    m_ransacConsensusPercentage(20.0), m_ransacFilterFlag(vpPose::NO_FILTER), m_ransacInliers(), m_ransacOutliers(),
+    m_ransacParallel(false), m_ransacParallelNbThreads(0), m_ransacReprojectionError(6.0),
     m_ransacThreshold(0.01), m_trainDescriptors(), m_trainKeyPoints(), m_trainPoints(), m_trainVpPoints(),
     m_useAffineDetection(false),
 #if (VISP_HAVE_OPENCV_VERSION >= 0x020400 && VISP_HAVE_OPENCV_VERSION < 0x030000)
@@ -177,9 +157,9 @@ vpKeyPoint::vpKeyPoint(const std::vector<std::string> &detectorNames, const std:
     m_matcher(), m_matcherName(matcherName), m_matches(), m_matchingFactorThreshold(2.0),
     m_matchingRatioThreshold(0.85), m_matchingTime(0.), m_matchRansacKeyPointsToPoints(), m_nbRansacIterations(200),
     m_nbRansacMinInlierCount(100), m_objectFilteredPoints(), m_poseTime(0.), m_queryDescriptors(),
-    m_queryFilteredKeyPoints(), m_queryKeyPoints(), m_ransacConsensusPercentage(20.0), m_ransacInliers(),
-    m_ransacOutliers(), m_ransacReprojectionError(6.0), m_ransacThreshold(0.01), m_trainDescriptors(),
-    m_trainKeyPoints(), m_trainPoints(), m_trainVpPoints(), m_useAffineDetection(false),
+    m_queryFilteredKeyPoints(), m_queryKeyPoints(), m_ransacConsensusPercentage(20.0), m_ransacFilterFlag(vpPose::NO_FILTER), m_ransacInliers(),
+    m_ransacOutliers(), m_ransacParallel(false), m_ransacParallelNbThreads(0), m_ransacReprojectionError(6.0), m_ransacThreshold(0.01),
+    m_trainDescriptors(), m_trainKeyPoints(), m_trainPoints(), m_trainVpPoints(), m_useAffineDetection(false),
 #if (VISP_HAVE_OPENCV_VERSION >= 0x020400 && VISP_HAVE_OPENCV_VERSION < 0x030000)
     m_useBruteForceCrossCheck(true),
 #endif
@@ -805,18 +785,18 @@ void vpKeyPoint::compute3DForPointsOnCylinders(
    Compute the pose using the correspondence between 2D points and 3D points
    using OpenCV function with RANSAC method.
 
-   \param imagePoints : List of 2D points corresponding to the location of the
-   detected keypoints. \param  objectPoints : List of the 3D points in the
-   object frame matched. \param cam : Camera parameters. \param cMo :
-   Homogeneous matrix between the object frame and the camera frame. \param
-   inlierIndex : List of indexes of inliers. \param elapsedTime : Elapsed
-   time. \param func : Function pointer to filter the final pose returned by
-   OpenCV pose estimation method. \return True if the pose has been computed,
-   false otherwise (not enough points, or size list mismatch).
+   \param imagePoints : List of 2D points corresponding to the location of the detected keypoints.
+   \param  objectPoints : List of the 3D points in the object frame matched.
+   \param cam : Camera parameters.
+   \param cMo : Homogeneous matrix between the object frame and the camera frame.
+   \param inlierIndex : List of indexes of inliers.
+   \param elapsedTime : Elapsed time.
+   \param func : Function pointer to filter the final pose returned by OpenCV pose estimation method.
+   \return True if the pose has been computed, false otherwise (not enough points, or size list mismatch).
  */
 bool vpKeyPoint::computePose(const std::vector<cv::Point2f> &imagePoints, const std::vector<cv::Point3f> &objectPoints,
                              const vpCameraParameters &cam, vpHomogeneousMatrix &cMo, std::vector<int> &inlierIndex,
-                             double &elapsedTime, bool (*func)(vpHomogeneousMatrix *))
+                             double &elapsedTime, bool (*func)(const vpHomogeneousMatrix &))
 {
   double t = vpTime::measureTimeMs();
 
@@ -888,7 +868,7 @@ bool vpKeyPoint::computePose(const std::vector<cv::Point2f> &imagePoints, const 
   if (func != NULL) {
     // Check the final pose returned by solvePnPRansac to discard
     // solutions which do not respect the pose criterion.
-    if (!func(&cMo)) {
+    if (!func(cMo)) {
       elapsedTime = (vpTime::measureTimeMs() - t);
       return false;
     }
@@ -902,16 +882,16 @@ bool vpKeyPoint::computePose(const std::vector<cv::Point2f> &imagePoints, const 
    Compute the pose using the correspondence between 2D points and 3D points
    using ViSP function with RANSAC method.
 
-   \param objectVpPoints : List of vpPoint with coordinates expressed in the
-   object and in the camera frame. \param cMo : Homogeneous matrix between the
-   object frame and the camera frame. \param inliers : List of inliers. \param
-   elapsedTime : Elapsed time. \return True if the pose has been computed,
-   false otherwise (not enough points, or size list mismatch). \param func :
-   Function pointer to filter the pose in Ransac pose estimation, if we want
+   \param objectVpPoints : List of vpPoint with coordinates expressed in the object and in the camera frame.
+   \param cMo : Homogeneous matrix between the object frame and the camera frame.
+   \param inliers : List of inliers.
+   \param elapsedTime : Elapsed time.
+   \param func : Function pointer to filter the pose in Ransac pose estimation, if we want
    to eliminate the poses which do not respect some criterion
+   \return True if the pose has been computed, false otherwise (not enough points, or size list mismatch).
  */
 bool vpKeyPoint::computePose(const std::vector<vpPoint> &objectVpPoints, vpHomogeneousMatrix &cMo,
-                             std::vector<vpPoint> &inliers, double &elapsedTime, bool (*func)(vpHomogeneousMatrix *))
+                             std::vector<vpPoint> &inliers, double &elapsedTime, bool (*func)(const vpHomogeneousMatrix &))
 {
   std::vector<unsigned int> inlierIndex;
   return computePose(objectVpPoints, cMo, inliers, inlierIndex, elapsedTime, func);
@@ -921,19 +901,18 @@ bool vpKeyPoint::computePose(const std::vector<vpPoint> &objectVpPoints, vpHomog
    Compute the pose using the correspondence between 2D points and 3D points
    using ViSP function with RANSAC method.
 
-   \param objectVpPoints : List of vpPoint with coordinates expressed in the
-   object and in the camera frame. \param cMo : Homogeneous matrix between the
-   object frame and the camera frame. \param inliers : List of inlier points.
+   \param objectVpPoints : List of vpPoint with coordinates expressed in the object and in the camera frame.
+   \param cMo : Homogeneous matrix between the object frame and the camera frame.
+   \param inliers : List of inlier points.
    \param inlierIndex : List of inlier index.
    \param elapsedTime : Elapsed time.
-   \return True if the pose has been computed, false otherwise (not enough
-   points, or size list mismatch). \param func : Function pointer to filter
-   the pose in Ransac pose estimation, if we want to eliminate the poses which
+   \return True if the pose has been computed, false otherwise (not enough points, or size list mismatch).
+   \param func : Function pointer to filter  the pose in Ransac pose estimation, if we want to eliminate the poses which
    do not respect some criterion
  */
 bool vpKeyPoint::computePose(const std::vector<vpPoint> &objectVpPoints, vpHomogeneousMatrix &cMo,
                              std::vector<vpPoint> &inliers, std::vector<unsigned int> &inlierIndex, double &elapsedTime,
-                             bool (*func)(vpHomogeneousMatrix *))
+                             bool (*func)(const vpHomogeneousMatrix &))
 {
   double t = vpTime::measureTimeMs();
 
@@ -957,6 +936,9 @@ bool vpKeyPoint::computePose(const std::vector<vpPoint> &objectVpPoints, vpHomog
         (unsigned int)(m_ransacConsensusPercentage / 100.0 * (double)m_queryFilteredKeyPoints.size());
   }
 
+  pose.setRansacFilterFlag(m_ransacFilterFlag);
+  pose.setUseParallelRansac(m_ransacParallel);
+  pose.setNbParallelRansacThreads(m_ransacParallelNbThreads);
   pose.setRansacNbInliersToReachConsensus(nbInlierToReachConsensus);
   pose.setRansacThreshold(m_ransacThreshold);
   pose.setRansacMaxTrials(m_nbRansacIterations);
@@ -1938,9 +1920,11 @@ void vpKeyPoint::initDetector(const std::string &detectorName)
 
   bool detectorInitialized = false;
   if (!usePyramid) {
-    detectorInitialized = (m_detectors[detectorNameTmp] != NULL);
+    //if not null and to avoid warning C4800: forcing value to bool 'true' or 'false' (performance warning)
+    detectorInitialized = !m_detectors[detectorNameTmp].empty();
   } else {
-    detectorInitialized = (m_detectors[detectorName] != NULL);
+    //if not null and to avoid warning C4800: forcing value to bool 'true' or 'false' (performance warning)
+    detectorInitialized = !m_detectors[detectorName].empty();
   }
 
   if (!detectorInitialized) {
@@ -2087,7 +2071,7 @@ void vpKeyPoint::initExtractor(const std::string &extractorName)
   }
 #endif
 
-  if (m_extractors[extractorName] == NULL) {
+  if (!m_extractors[extractorName]) { //if null
     std::stringstream ss_msg;
     ss_msg << "Fail to initialize the extractor: " << extractorName
            << " or it is not available in OpenCV version: " << std::hex << VISP_HAVE_OPENCV_VERSION << ".";
@@ -2234,7 +2218,7 @@ void vpKeyPoint::initMatcher(const std::string &matcherName)
   }
 #endif
 
-  if (m_matcher == NULL) {
+  if (!m_matcher) { //if null
     std::stringstream ss_msg;
     ss_msg << "Fail to initialize the matcher: " << matcherName
            << " or it is not available in OpenCV version: " << std::hex << VISP_HAVE_OPENCV_VERSION << ".";
@@ -3014,15 +2998,14 @@ unsigned int vpKeyPoint::matchPoint(const vpImage<unsigned char> &I, const vpRec
 
    \param I : Input image
    \param cam : Camera parameters
-   \param cMo : Homogeneous matrix between the object frame and the camera
-   frame \param func : Function pointer to filter the pose in Ransac pose
-   estimation, if we want to eliminate the poses which do not respect some
-   criterion \param rectangle : Rectangle corresponding to the ROI (Region of
-   Interest) to consider \return True if the matching and the pose estimation
-   are OK, false otherwise
+   \param cMo : Homogeneous matrix between the object frame and the camera frame
+   \param func : Function pointer to filter the pose in Ransac pose
+   estimation, if we want to eliminate the poses which do not respect some criterion
+   \param rectangle : Rectangle corresponding to the ROI (Region of Interest) to consider
+   \return True if the matching and the pose estimation are OK, false otherwise
  */
 bool vpKeyPoint::matchPoint(const vpImage<unsigned char> &I, const vpCameraParameters &cam, vpHomogeneousMatrix &cMo,
-                            bool (*func)(vpHomogeneousMatrix *), const vpRect &rectangle)
+                            bool (*func)(const vpHomogeneousMatrix &), const vpRect &rectangle)
 {
   double error, elapsedTime;
   return matchPoint(I, cam, cMo, error, elapsedTime, func, rectangle);
@@ -3034,18 +3017,17 @@ bool vpKeyPoint::matchPoint(const vpImage<unsigned char> &I, const vpCameraParam
 
    \param I : Input image
    \param cam : Camera parameters
-   \param cMo : Homogeneous matrix between the object frame and the camera
-   frame \param error : Reprojection mean square error (in pixel) between the
+   \param cMo : Homogeneous matrix between the object frame and the camera frame
+   \param error : Reprojection mean square error (in pixel) between the
    2D points and the projection of the 3D points with the estimated pose
    \param elapsedTime : Time to detect, extract, match and compute the pose
    \param func : Function pointer to filter the pose in Ransac pose
-   estimation, if we want to eliminate the poses which do not respect some
-   criterion \param rectangle : Rectangle corresponding to the ROI (Region of
-   Interest) to consider \return True if the matching and the pose estimation
-   are OK, false otherwise
+   estimation, if we want to eliminate the poses which do not respect some criterion
+   \param rectangle : Rectangle corresponding to the ROI (Region of Interest) to consider
+   \return True if the matching and the pose estimation are OK, false otherwise
  */
 bool vpKeyPoint::matchPoint(const vpImage<unsigned char> &I, const vpCameraParameters &cam, vpHomogeneousMatrix &cMo,
-                            double &error, double &elapsedTime, bool (*func)(vpHomogeneousMatrix *),
+                            double &error, double &elapsedTime, bool (*func)(const vpHomogeneousMatrix &),
                             const vpRect &rectangle)
 {
   // Check if we have training descriptors
@@ -3360,22 +3342,21 @@ bool vpKeyPoint::matchPointAndDetect(const vpImage<unsigned char> &I, vpRect &bo
 
    \param I : Input image
    \param cam : Camera parameters
-   \param cMo : Homogeneous matrix between the object frame and the camera
-   frame \param error : Reprojection mean square error (in pixel) between the
+   \param cMo : Homogeneous matrix between the object frame and the camera frame
+   \param error : Reprojection mean square error (in pixel) between the
    2D points and the projection of the 3D points with the estimated pose
    \param elapsedTime : Time to detect, extract, match and compute the pose
    \param boundingBox : Bounding box that contains the good matches
    \param centerOfGravity : Center of gravity computed from the location of
-   the good matches (could differ of the center of the bounding box) \param
-   func : Function pointer to filter the pose in Ransac pose estimation, if we
-   want to eliminate the poses which do not respect some criterion \param
-   rectangle : Rectangle corresponding to the ROI (Region of Interest) to
-   consider \return True if the matching and the pose estimation are OK, false
-   otherwise.
+   the good matches (could differ of the center of the bounding box)
+   \param func : Function pointer to filter the pose in Ransac pose estimation, if we
+   want to eliminate the poses which do not respect some criterion
+   \param rectangle : Rectangle corresponding to the ROI (Region of Interest) to consider
+   \return True if the matching and the pose estimation are OK, false otherwise.
  */
 bool vpKeyPoint::matchPointAndDetect(const vpImage<unsigned char> &I, const vpCameraParameters &cam,
                                      vpHomogeneousMatrix &cMo, double &error, double &elapsedTime, vpRect &boundingBox,
-                                     vpImagePoint &centerOfGravity, bool (*func)(vpHomogeneousMatrix *),
+                                     vpImagePoint &centerOfGravity, bool (*func)(const vpHomogeneousMatrix &),
                                      const vpRect &rectangle)
 {
   bool isMatchOk = matchPoint(I, cam, cMo, error, elapsedTime, func, rectangle);
@@ -3601,8 +3582,11 @@ void vpKeyPoint::reset()
   m_queryFilteredKeyPoints.clear();
   m_queryKeyPoints.clear();
   m_ransacConsensusPercentage = 20.0;
+  m_ransacFilterFlag = vpPose::NO_FILTER;
   m_ransacInliers.clear();
   m_ransacOutliers.clear();
+  m_ransacParallel = true;
+  m_ransacParallelNbThreads = 0;
   m_ransacReprojectionError = 6.0;
   m_ransacThreshold = 0.01;
   m_trainDescriptors = cv::Mat();

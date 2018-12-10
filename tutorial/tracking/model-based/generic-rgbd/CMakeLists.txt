@@ -2,11 +2,12 @@ project(tutorial-tracking-mb-generic-rgbd)
 
 cmake_minimum_required(VERSION 2.6)
 
-find_package(VISP REQUIRED visp_core visp_mbt visp_io visp_gui)
+find_package(VISP REQUIRED visp_core visp_mbt visp_io visp_gui visp_sensor)
 
 # set the list of source files
 set(tutorial_cpp
-  tutorial-mb-generic-tracker-rgbd.cpp)
+  tutorial-mb-generic-tracker-rgbd.cpp
+  tutorial-mb-generic-tracker-rgbd-realsense.cpp)
 
 file(GLOB tutorial_data data/color_image_*.jpg data/depth_image_*.bin)
 list(APPEND tutorial_data "${CMAKE_CURRENT_SOURCE_DIR}/cube_depth.xml")
@@ -20,7 +21,20 @@ foreach(cpp ${tutorial_cpp})
   visp_add_target(${cpp})
 
   if(VISP_HAVE_OGRE)
-    visp_set_source_file_compile_flag(${cpp} -Wno-unused-parameter -Wno-unused-but-set-parameter -Wno-overloaded-virtual)
+    # Add specific build flag to turn off warnings coming from Ogre3D 3rd party
+    list(APPEND CXX_FLAGS_MUTE_WARNINGS "-Wno-ignored-qualifiers")
+    list(APPEND CXX_FLAGS_MUTE_WARNINGS "-Wno-unused-parameter")
+    list(APPEND CXX_FLAGS_MUTE_WARNINGS "-Wno-unused-but-set-parameter")
+    list(APPEND CXX_FLAGS_MUTE_WARNINGS "-Wno-overloaded-virtual")
+  endif()
+  if(VISP_HAVE_REALSENSE2)
+    # Add specific build flag to turn off warnings coming from librealsense 3rd party
+    list(APPEND CXX_FLAGS_MUTE_WARNINGS "/wd4244")
+  endif()
+
+  if(CXX_FLAGS_MUTE_WARNINGS)
+    # Add specific build flag to turn off warnings
+    visp_set_source_file_compile_flag(${cpp} ${CXX_FLAGS_MUTE_WARNINGS})
   endif()
 
   if(COMMAND visp_add_dependency)

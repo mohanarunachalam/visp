@@ -97,8 +97,8 @@ if(USE_OPENMP)
   add_extra_compiler_option("${OpenMP_CXX_FLAGS}")
 endif()
 
-if(USE_CPP11)
-  add_extra_compiler_option("${CPP11_CXX_FLAGS}")
+if(USE_CXX11 AND CXX11_CXX_FLAGS)
+  add_extra_compiler_option("${CXX11_CXX_FLAGS}")
 endif()
 
 if(BUILD_COVERAGE)
@@ -126,14 +126,14 @@ if(CMAKE_COMPILER_IS_GNUCXX)
     add_extra_compiler_option(-mno-ssse3)
   endif()
 
-  if(X86)
+  if(X86 AND NOT IOS)
     add_extra_compiler_option(-ffloat-store)
   endif()
 endif()
 
 if(UNIX)
   if(CMAKE_COMPILER_IS_GNUCXX)
-    add_extra_compiler_option(-fPIC)
+    add_extra_compiler_option(-fPIC) # Is needed for ANDROID too.
   endif()
 endif()
 

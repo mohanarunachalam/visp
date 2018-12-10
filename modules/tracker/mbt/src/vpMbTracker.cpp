@@ -151,7 +151,7 @@ vpMbTracker::vpMbTracker()
     m_projectionErrorFaces(), m_projectionErrorOgreShowConfigDialog(false),
     m_projectionErrorMe(), m_projectionErrorKernelSize(2), m_SobelX(5,5), m_SobelY(5,5),
     m_projectionErrorDisplay(false), m_projectionErrorDisplayLength(20), m_projectionErrorDisplayThickness(1),
-    m_projectionErrorCam()
+    m_projectionErrorCam(), m_mask(NULL)
 {
   oJo.eye();
   // Map used to parse additional information in CAO model files,
@@ -165,10 +165,32 @@ vpMbTracker::vpMbTracker()
   vpImageFilter::getSobelKernelY(m_SobelY.data, m_projectionErrorKernelSize);
 }
 
-/*!
-  Basic destructor that doest nothing.
-*/
-vpMbTracker::~vpMbTracker() {}
+vpMbTracker::~vpMbTracker() {
+  vpMbtDistanceLine *l;
+  vpMbtDistanceCylinder *cy;
+  vpMbtDistanceCircle *ci;
+
+  for (std::vector<vpMbtDistanceLine *>::const_iterator it = m_projectionErrorLines.begin(); it != m_projectionErrorLines.end(); ++it) {
+    l = *it;
+    if (l != NULL)
+      delete l;
+    l = NULL;
+  }
+
+  for (std::vector<vpMbtDistanceCylinder *>::const_iterator it = m_projectionErrorCylinders.begin(); it != m_projectionErrorCylinders.end(); ++it) {
+    cy = *it;
+    if (cy != NULL)
+      delete cy;
+    cy = NULL;
+  }
+
+  for (std::vector<vpMbtDistanceCircle *>::const_iterator it = m_projectionErrorCircles.begin(); it != m_projectionErrorCircles.end(); ++it) {
+    ci = *it;
+    if (ci != NULL)
+      delete ci;
+    ci = NULL;
+  }
+}
 
 #ifdef VISP_HAVE_MODULE_GUI
 /*!
@@ -395,10 +417,22 @@ void vpMbTracker::initClick(const vpImage<unsigned char> &I, const std::string &
       vpDisplay::display(I);
 
       vpHomogeneousMatrix cMo1, cMo2;
-      pose.computePose(vpPose::LAGRANGE, cMo1);
-      double d1 = pose.computeResidual(cMo1);
-      pose.computePose(vpPose::DEMENTHON, cMo2);
-      double d2 = pose.computeResidual(cMo2);
+      double d1, d2;
+      d1 = d2 = std::numeric_limits<double>::max();
+      try {
+        pose.computePose(vpPose::LAGRANGE, cMo1);
+        d1 = pose.computeResidual(cMo1);
+      }
+      catch(...) {
+        // Lagrange non-planar cannot work with less than 6 points
+      }
+      try {
+        pose.computePose(vpPose::DEMENTHON, cMo2);
+        d2 = pose.computeResidual(cMo2);
+      }
+      catch(...) {
+        // Should not occur
+      }
 
       if (d1 < d2) {
         cMo = cMo1;
@@ -518,10 +552,22 @@ void vpMbTracker::initClick(const vpImage<unsigned char> &I, const std::vector<v
     vpDisplay::flush(I);
 
     vpHomogeneousMatrix cMo1, cMo2;
-    pose.computePose(vpPose::LAGRANGE, cMo1);
-    double d1 = pose.computeResidual(cMo1);
-    pose.computePose(vpPose::DEMENTHON, cMo2);
-    double d2 = pose.computeResidual(cMo2);
+    double d1, d2;
+    d1 = d2 = std::numeric_limits<double>::max();
+    try {
+      pose.computePose(vpPose::LAGRANGE, cMo1);
+      d1 = pose.computeResidual(cMo1);
+    }
+    catch(...) {
+      // Lagrange non-planar cannot work with less than 6 points
+    }
+    try {
+      pose.computePose(vpPose::DEMENTHON, cMo2);
+      d2 = pose.computeResidual(cMo2);
+    }
+    catch(...) {
+      // Should not occur
+    }
 
     if (d1 < d2) {
       cMo = cMo1;
@@ -695,10 +741,22 @@ void vpMbTracker::initFromPoints(const vpImage<unsigned char> &I, const std::str
   finit.close();
 
   vpHomogeneousMatrix cMo1, cMo2;
-  pose.computePose(vpPose::LAGRANGE, cMo1);
-  double d1 = pose.computeResidual(cMo1);
-  pose.computePose(vpPose::DEMENTHON, cMo2);
-  double d2 = pose.computeResidual(cMo2);
+  double d1, d2;
+  d1 = d2 = std::numeric_limits<double>::max();
+  try {
+    pose.computePose(vpPose::LAGRANGE, cMo1);
+    d1 = pose.computeResidual(cMo1);
+  }
+  catch(...) {
+    // Lagrange non-planar cannot work with less than 6 points
+  }
+  try {
+    pose.computePose(vpPose::DEMENTHON, cMo2);
+    d2 = pose.computeResidual(cMo2);
+  }
+  catch(...) {
+    // Should not occur
+  }
 
   if (d1 < d2)
     cMo = cMo1;
@@ -741,10 +799,22 @@ void vpMbTracker::initFromPoints(const vpImage<unsigned char> &I, const std::vec
   }
 
   vpHomogeneousMatrix cMo1, cMo2;
-  pose.computePose(vpPose::LAGRANGE, cMo1);
-  double d1 = pose.computeResidual(cMo1);
-  pose.computePose(vpPose::DEMENTHON, cMo2);
-  double d2 = pose.computeResidual(cMo2);
+  double d1, d2;
+  d1 = d2 = std::numeric_limits<double>::max();
+  try {
+    pose.computePose(vpPose::LAGRANGE, cMo1);
+    d1 = pose.computeResidual(cMo1);
+  }
+  catch(...) {
+    // Lagrange non-planar cannot work with less than 6 points
+  }
+  try {
+    pose.computePose(vpPose::DEMENTHON, cMo2);
+    d2 = pose.computeResidual(cMo2);
+  }
+  catch(...) {
+    // Should not occur
+  }
 
   if (d1 < d2)
     cMo = cMo1;
@@ -3259,7 +3329,7 @@ void vpMbTracker::projectionErrorInitMovingEdge(const vpImage<unsigned char> &I,
       l->setVisible(true);
       l->updateTracked();
       if (l->meline.empty() && l->isTracked())
-        l->initMovingEdge(I, _cMo, doNotTrack);
+        l->initMovingEdge(I, _cMo, doNotTrack, m_mask);
     } else {
       l->setVisible(false);
       for (size_t a = 0; a < l->meline.size(); a++) {
@@ -3293,7 +3363,7 @@ void vpMbTracker::projectionErrorInitMovingEdge(const vpImage<unsigned char> &I,
       cy->setVisible(true);
       if (cy->meline1 == NULL || cy->meline2 == NULL) {
         if (cy->isTracked())
-          cy->initMovingEdge(I, _cMo, doNotTrack);
+          cy->initMovingEdge(I, _cMo, doNotTrack, m_mask);
       }
     } else {
       cy->setVisible(false);
@@ -3326,7 +3396,7 @@ void vpMbTracker::projectionErrorInitMovingEdge(const vpImage<unsigned char> &I,
       ci->setVisible(true);
       if (ci->meEllipse == NULL) {
         if (ci->isTracked())
-          ci->initMovingEdge(I, _cMo, doNotTrack);
+          ci->initMovingEdge(I, _cMo, doNotTrack, m_mask);
       }
     } else {
       ci->setVisible(false);
@@ -3404,3 +3474,4 @@ void vpMbTracker::setProjectionErrorKernelSize(const unsigned int &size)
   m_SobelY.resize(size*2+1, size*2+1, false, false);
   vpImageFilter::getSobelKernelY(m_SobelY.data, size);
 }
+

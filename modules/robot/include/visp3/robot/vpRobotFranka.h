@@ -53,6 +53,7 @@
 #include <franka/exception.h>
 #include <franka/robot.h>
 #include <franka/model.h>
+#include <franka/gripper.h>
 
 #include <visp3/core/vpColVector.h>
 #include <visp3/robot/vpRobot.h>
@@ -234,6 +235,8 @@ private:
   void init();
 
   franka::Robot *m_handler; //!< Robot handler
+  franka::Gripper *m_gripper; //!< Gripper handler
+  franka::Model *m_model;
   double m_positionningVelocity;
 
   std::thread m_controlThread;
@@ -252,6 +255,7 @@ private:
   vpColVector m_v_cart_des;             // Desired cartesian velocity either in reference, end-effector, camera, or tool frame
   vpHomogeneousMatrix m_eMc;
   std::string m_log_folder;
+  std::string m_franka_address;
 
 public:
   vpRobotFranka();
@@ -269,7 +273,28 @@ public:
   vpHomogeneousMatrix get_eMc() const;
 
   void get_eJe(vpMatrix &eJe);
+  void get_eJe(const vpColVector &q, vpMatrix &eJe);
   void get_fJe(vpMatrix &fJe);
+  void get_fJe(const vpColVector &q, vpMatrix &fJe);
+
+  void getCoriolis(vpColVector &coriolis);
+  void getForceTorque(const vpRobot::vpControlFrameType frame, vpColVector &force);
+
+  void getGravity(vpColVector &gravity);
+
+  /*!
+   * Get gripper handler to access native libfranka functions.
+   *
+   * \return Robot handler if it exists, an exception otherwise.
+   */
+  franka::Gripper *getGripperHandler() {
+    if (!m_gripper) {
+      throw(vpException(vpException::fatalError, "Cannot get Franka gripper handler: gripper is not connected"));
+    }
+
+    return m_gripper;
+  }
+
 
   /*!
    * Get robot handler to access native libfranka functions.
@@ -287,8 +312,24 @@ public:
   vpColVector getJointMin() const;
   vpColVector getJointMax() const;
 
+  void getMass(vpMatrix &mass);
+
   void getPosition(const vpRobot::vpControlFrameType frame, vpColVector &position);
   void getPosition(const vpRobot::vpControlFrameType frame, vpPoseVector &pose);
+
+  void getVelocity(const vpRobot::vpControlFrameType frame, vpColVector &d_position);
+
+  int gripperClose();
+  int gripperGrasp(double grasping_width, double force=60.);
+  void gripperHoming();
+  int gripperMove(double width);
+  int gripperOpen();
+  void gripperRelease();
+
+  void move(const std::string &filename, double velocity_percentage=10.);
+
+  bool readPosFile(const std::string &filename, vpColVector &q);
+  bool savePosFile(const std::string &filename, const vpColVector &q);
 
   void set_eMc(const vpHomogeneousMatrix &eMc);
   void setLogFolder(const std::string &folder);
@@ -297,6 +338,8 @@ public:
 
   vpRobot::vpRobotStateType setRobotState(vpRobot::vpRobotStateType newState);
   void setVelocity(const vpRobot::vpControlFrameType frame, const vpColVector &vel);
+
+  void stopMotion();
 };
 
 #endif

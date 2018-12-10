@@ -398,7 +398,11 @@ void vpImageTools::integralImage(const vpImage<unsigned char> &I, vpImage<double
   \param useOptimized : Use SSE if true and available.
 */
 double vpImageTools::normalizedCorrelation(const vpImage<double> &I1, const vpImage<double> &I2,
+#if VISP_HAVE_SSE2
                                            const bool useOptimized)
+#else
+                                           const bool)
+#endif
 {
   if ((I1.getHeight() != I2.getHeight()) || (I1.getWidth() != I2.getWidth())) {
     throw vpException(vpException::dimensionError, "Error: in vpImageTools::normalizedCorrelation(): "
@@ -413,12 +417,13 @@ double vpImageTools::normalizedCorrelation(const vpImage<double> &I1, const vpIm
   double a2 = 0.0;
   double b2 = 0.0;
 
-  const double *ptr_I1 = I1.bitmap;
-  const double *ptr_I2 = I2.bitmap;
   unsigned int cpt = 0;
 
 #if VISP_HAVE_SSE2
   if (vpCPUFeatures::checkSSE2() && I1.getSize() >= 2 && useOptimized) {
+    const double *ptr_I1 = I1.bitmap;
+    const double *ptr_I2 = I2.bitmap;
+
     const __m128d v_mean_a = _mm_set1_pd(a);
     const __m128d v_mean_b = _mm_set1_pd(b);
     __m128d v_ab = _mm_setzero_pd();

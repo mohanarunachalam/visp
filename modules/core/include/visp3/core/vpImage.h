@@ -218,6 +218,8 @@ public:
    */
   inline unsigned int getSize() const { return width * height; }
 
+  // Gets the value of a pixel at a location.
+  Type getValue(unsigned int i, unsigned int j) const;
   // Gets the value of a pixel at a location with bilinear interpolation.
   Type getValue(double i, double j) const;
   // Gets the value of a pixel at a location with bilinear interpolation.
@@ -315,7 +317,7 @@ public:
   vpImage<Type> &operator=(const Type &v);
   bool operator==(const vpImage<Type> &I);
   bool operator!=(const vpImage<Type> &I);
-  friend std::ostream &operator<<<>(std::ostream &s, const vpImage<Type> &I);
+  friend std::ostream &operator<< <>(std::ostream &s, const vpImage<Type> &I);
   friend std::ostream &operator<<(std::ostream &s, const vpImage<unsigned char> &I);
   friend std::ostream &operator<<(std::ostream &s, const vpImage<char> &I);
   friend std::ostream &operator<<(std::ostream &s, const vpImage<float> &I);
@@ -740,7 +742,7 @@ void vpImage<Type>::init(Type *const array, const unsigned int h, const unsigned
     }
 
     // Copy the image data
-    memcpy(bitmap, array, (size_t)(npixels * sizeof(Type)));
+    memcpy(static_cast<void*>(bitmap), static_cast<void*>(array), (size_t)(npixels * sizeof(Type)));
   } else {
     // Copy the address of the array in the bitmap
     bitmap = array;
@@ -924,7 +926,7 @@ template <class Type>
 vpImage<Type>::vpImage(const vpImage<Type> &I) : bitmap(NULL), display(NULL), npixels(0), width(0), height(0), row(NULL)
 {
   resize(I.getHeight(), I.getWidth());
-  memcpy(bitmap, I.bitmap, I.npixels * sizeof(Type));
+  memcpy(static_cast<void*>(bitmap), static_cast<void*>(I.bitmap), I.npixels * sizeof(Type));
 }
 
 #ifdef VISP_HAVE_CPP11_COMPATIBILITY
@@ -1226,7 +1228,7 @@ template <class Type> void vpImage<Type>::insert(const vpImage<Type> &src, const
     Type *srcBitmap = src.bitmap + ((src_ibegin + i) * src_w + src_jbegin);
     Type *destBitmap = this->bitmap + ((dest_ibegin + i) * dest_w + dest_jbegin);
 
-    memcpy(destBitmap, srcBitmap, (size_t)wsize * sizeof(Type));
+    memcpy(static_cast<void*>(destBitmap), static_cast<void*>(srcBitmap), (size_t)wsize * sizeof(Type));
   }
 }
 
@@ -1399,6 +1401,29 @@ template <class Type> void vpImage<Type>::doubleSizeImage(vpImage<Type> &res)
     for (int j = 1; j < w - 1; j += 2)
       res[i][j] = (Type)(0.25 * ((*this)[i >> 1][j >> 1] + (*this)[i >> 1][(j >> 1) + 1] +
                                  (*this)[(i >> 1) + 1][j >> 1] + (*this)[(i >> 1) + 1][(j >> 1) + 1]));
+}
+
+/*!
+  Retrieves pixel value from an image containing values of type \e Type
+
+  Gets the value of a sub-pixel with coordinates (i,j).
+
+  \param i : Pixel coordinate along the rows.
+  \param j : Pixel coordinate along the columns.
+
+  \return Pixel value.
+
+  \exception vpImageException::notInTheImage : If (i,j) is out
+  of the image.
+
+*/
+template <class Type> inline Type vpImage<Type>::getValue(unsigned int i, unsigned int j) const
+{
+  if (i >= height || j >= width) {
+    throw(vpException(vpImageException::notInTheImage, "Pixel outside the image"));
+  }
+
+  return row[i][j];
 }
 
 /*!
